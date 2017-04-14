@@ -30,6 +30,7 @@ with open('seed_msa_seqs_and_pa_matrix.xlsx', 'wb') as outfile:
     ga_df = pd.DataFrame()
     accession_list = []
     for species in sp_list:
+        print(species)
         sp_fullname = species.split(' ')[0] + '_' + species.split(' ')[1]
         sp_shortname = species.split(' ')[0][0] + '_' + species.split(' ')[1]
         sum_fn = sp_shortname + '_asummary.txt'
@@ -54,6 +55,9 @@ with open('seed_msa_seqs_and_pa_matrix.xlsx', 'wb') as outfile:
             for assembly_id in assembly_ids:
                 term = assembly_id + ' AND complete genome'
                 refseq_id = Entrez.read(Entrez.esearch(db='nucleotide', term=term))['IdList']
+                if len(refseq_id) == 0:
+                    print('no Ids found for assembly: %s. Species: %s' % (assembly_id, species))
+                    break
                 seq_record = Entrez.efetch(db='nucleotide', id=refseq_id, retmode='xml')
                 results = Entrez.read(seq_record)
                 accession = results[0]['GBSeq_accession-version']
