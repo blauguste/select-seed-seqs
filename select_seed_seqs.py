@@ -195,13 +195,13 @@ def dl_select_align(sp_infile, hub_species, hub_accession, wkbk_out):
                 all_seed_seqs = all_seed_seqs.append(seed_seqs)
             all_seed_seqs.to_excel(writer, sheet_name='seed_sequences')
             writer.save()
-                # Write the select sequences to file.
-                aligned_outfn = name + '_seqs_clusaligned.fa'
-                with open(prealign_fn, 'w') as prealign_out:
-                    SeqIO.write(seq_records, prealign_out, 'fasta')
-                # Align the sequences with Clustal and write to file
-                clustal_align = ClustalOmegaCommandline(infile=prealign_fn, outfile=aligned_outfn, verbose=True)
-                clustal_align()
+            # Write the select sequences to file.
+            aligned_outfn = name + '_seqs_clusaligned.fa'
+            with open(prealign_fn, 'w') as prealign_out:
+                SeqIO.write(seq_records, prealign_out, 'fasta')
+            # Align the sequences with Clustal and write to file
+            clustal_align = ClustalOmegaCommandline(infile=prealign_fn, outfile=aligned_outfn, verbose=True)
+            clustal_align()
 
             #plot.show()
 # Make a pident hist of all sRNAs at once
