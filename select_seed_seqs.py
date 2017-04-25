@@ -90,10 +90,8 @@ def dl_select_align(sp_infile, hub_species, hub_accession, wkbk_out):
                     net_handle = Entrez.efetch(db='nucleotide', id=acc, rettype='fasta', retmode='text')
                     strain_out.write(net_handle.read())
         print('Coolio. Now all the genomes you need are downloaded. Make a blast database out of them and blast the sRNA sequences again them. Then input a filtered file of your blast results to continue to the next step.')
-
-    fil_blast_name = input('Name of filtered, tabular BLAST results from sRNAs vs. all hub relatives: ')
+        fil_blast_name = input('Name of filtered, tabular BLAST results from sRNAs vs. all hub relatives: ')
     ###################################################################################################################################################################
-
     # Input should be filtered BLAST tabular results (top hit per query-subject pair; one HSP only)
         with open(fil_blast_name, 'r') as infile:
             col_names = ['qseqid', 'sseqid', 'stitle', 'pident', 'qcovs', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'ssend', 'evalue', 'bitscore', 'qseq', 'sseq']
