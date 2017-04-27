@@ -121,7 +121,6 @@ def dl_select_align(sp_infile, hub_species, hub_accession, wkbk_out):
                             pa_dict[sp_name] = True
                         else: pa_dict[sp_name] = False
                     else: pa_dict[sp_name] = False
-                print(pa_dict)
                 # Add that dictionary to the empty data frame
                 pa_matrix[name] = pd.Series(pa_dict)
             # Convert the Trues/Falses to ones and zeros and write this presence/absence matrix to file
