@@ -1,6 +1,6 @@
 import csv, sys
 import pandas as pd
-import matplotlib.pyplot as plot
+#import matplotlib.pyplot as plot
 import numpy as np
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -96,8 +96,6 @@ def dl_select_align(sp_infile, hub_species, hub_accession, wkbk_out):
         with open(fil_blast_name, 'r') as infile:
             col_names = ['qseqid', 'sseqid', 'stitle', 'pident', 'qcovs', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'ssend', 'evalue', 'bitscore', 'qseq', 'sseq']
             df = pd.read_csv(infile, sep='\t', header=None, names=col_names)
-            print(df.shape)
-            print(df.head)
             # Reformat the sseqid column to show accession numbers and the stitle column to show just species names
             df['sseqid'] = df['sseqid'].apply(get_acc_num)
             df['stitle'] = df['stitle'].apply(get_sp_name)
@@ -126,16 +124,12 @@ def dl_select_align(sp_infile, hub_species, hub_accession, wkbk_out):
                 print(pa_dict)
                 # Add that dictionary to the empty data frame
                 pa_matrix[name] = pd.Series(pa_dict)
-                print(pa_matrix.head(n=35))
             # Convert the Trues/Falses to ones and zeros and write this presence/absence matrix to file
             pa_matrix = pa_matrix.astype(int)
             pa_matrix.to_excel(writer, sheet_name='pa_matrix_for_GLOOME')
-
-            print(pa_matrix.head)
             # Prepare to convert pa matrix to fasta
             pa_concat = pa_matrix.apply(lambda row: ''.join(map(str, row)), axis=1)
             # Set of records for fasta
-            print(type(pa_concat))
             with open('msa_for_GLOOME.fa', 'w') as msa_out:
                 msa_records = []
                 for i, val in pa_concat.iteritems():
@@ -193,15 +187,17 @@ def dl_select_align(sp_infile, hub_species, hub_accession, wkbk_out):
                     new_rec = SeqRecord(Seq(seq), id=accession, description=description)
                     seq_records.append(new_rec)
                 all_seed_seqs = all_seed_seqs.append(seed_seqs)
+            # Write the select sequences to file.
+                aligned_outfn = name + '_seqs_clusaligned.fa'
+                with open(prealign_fn, 'w') as prealign_out:
+                    SeqIO.write(seq_records, prealign_out, 'fasta')
+                # Align the sequences with Clustal and write to file
+                if len(seq_records) > 1:
+                    clustal_align = ClustalOmegaCommandline(infile=prealign_fn, outfile=aligned_outfn, verbose=True)
+                    clustal_align()
+                else: print('Note: Only one sequence for srna %s. Good luck with that.' % name)
             all_seed_seqs.to_excel(writer, sheet_name='seed_sequences')
             writer.save()
-            # Write the select sequences to file.
-            aligned_outfn = name + '_seqs_clusaligned.fa'
-            with open(prealign_fn, 'w') as prealign_out:
-                SeqIO.write(seq_records, prealign_out, 'fasta')
-            # Align the sequences with Clustal and write to file
-            clustal_align = ClustalOmegaCommandline(infile=prealign_fn, outfile=aligned_outfn, verbose=True)
-            clustal_align()
 
             #plot.show()
 # Make a pident hist of all sRNAs at once
