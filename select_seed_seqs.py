@@ -61,11 +61,11 @@ def dl_select_align(sp_infile, hub_species, hub_accession, wkbk_out):
                 assembly_ids = (list(assembly_df['gbrs_paired_asm']))
                 # Query NCBI databases to find accession number associated with selected chromosome assembly
                 for assembly_id in assembly_ids:
-                    term = assembly_id + ' AND complete genome'
+                    term = assembly_id + ' AND "complete genome" NOT plasmid[Title]'
                     refseq_id = Entrez.read(Entrez.esearch(db='nucleotide', term=term))['IdList']
                     if len(refseq_id) == 0:
                         print('no Ids found for assembly: %s. Species: %s' % (assembly_id, species))
-                        break
+                        continue
                     seq_record = Entrez.efetch(db='nucleotide', id=refseq_id, retmode='xml')
                     results = Entrez.read(seq_record)
                     accession = results[0]['GBSeq_accession-version']
