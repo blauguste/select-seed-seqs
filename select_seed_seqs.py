@@ -61,7 +61,7 @@ def dl_select_align(sp_infile, hub_species, hub_accession, wkbk_out):
                 assembly_ids = (list(assembly_df['gbrs_paired_asm']))
                 # Query NCBI databases to find accession number associated with selected chromosome assembly
                 for assembly_id in assembly_ids:
-                    term = assembly_id + ' AND "complete genome" NOT plasmid[Title]'
+                    term = assembly_id + ' AND complete genome NOT plasmid[Title]'
                     refseq_id = Entrez.read(Entrez.esearch(db='nucleotide', term=term))['IdList']
                     if len(refseq_id) == 0:
                         print('no Ids found for assembly: %s. Species: %s' % (assembly_id, species))
@@ -94,7 +94,7 @@ def dl_select_align(sp_infile, hub_species, hub_accession, wkbk_out):
     ###################################################################################################################################################################
     # Input should be filtered BLAST tabular results (top hit per query-subject pair; one HSP only)
         with open(fil_blast_name, 'r') as infile:
-            col_names = ['qseqid', 'sseqid', 'stitle', 'pident', 'qcovs', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'ssend', 'evalue', 'bitscore', 'qseq', 'sseq']
+            col_names = ['qseqid', 'sseqid', 'stitle', 'pident', 'qcovs', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'ssend', 'qframe', 'sframe', 'frames', 'evalue', 'bitscore', 'qseq', 'sseq']
             df = pd.read_csv(infile, sep='\t', header=None, names=col_names)
             # Reformat the sseqid column to show accession numbers and the stitle column to show just species names
             df['sseqid'] = df['sseqid'].apply(get_acc_num)
@@ -115,12 +115,13 @@ def dl_select_align(sp_infile, hub_species, hub_accession, wkbk_out):
             for name, data in pam_sRNA_grp:
                 stitle_val_cts = data['stitle'].value_counts()
                 for sp_name, num_genomes in sp_gen_ct_dict.items():
+                    sp_short = sp_name.split('_')[0][0] + '_' + sp_name.split('_')[1]
                     if sp_name in stitle_val_cts.index:
                         num_results = stitle_val_cts.get_value(sp_name)
                         if num_results >= 0.75 * num_genomes:
-                            pa_dict[sp_name] = True
-                        else: pa_dict[sp_name] = False
-                    else: pa_dict[sp_name] = False
+                            pa_dict[sp_short] = True
+                        else: pa_dict[sp_short] = False
+                    else: pa_dict[sp_short] = False
                 # Add that dictionary to the empty data frame
                 pa_matrix[name] = pd.Series(pa_dict)
             # Convert the Trues/Falses to ones and zeros and write this presence/absence matrix to file
