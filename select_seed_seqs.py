@@ -1,4 +1,4 @@
-import csv, sys
+import csv, sys, os
 import pandas as pd
 #import matplotlib.pyplot as plot
 import numpy as np
@@ -31,14 +31,16 @@ def dl_select_align(sp_infile, hub_species, hub_accession, wkbk_out):
     with open(wkbk_out, 'wb') as outfile:
         writer = pd.ExcelWriter(outfile)
         ga_df = pd.DataFrame()
-        accession_list = []
+        accession_dict = {}
         hub_sp_accs = []
         sp_gen_ct_dict = {}
         for species in sp_list:
+            accession_dict['%s' % get_sp_name(species)] = []
             print(species)
             sp_gen_ct = 0
             sp_fullname = species.split(' ')[0] + '_' + species.split(' ')[1]
             sp_shortname = species.split(' ')[0][0] + '_' + species.split(' ')[1]
+            accession_dict['%s' % sp_fullname] = []
             sum_fn = sp_shortname + '_asummary.txt'
             if not os.path.isfile(sum_fn):
                 with open(sum_fn, 'wb') as sumfile:
@@ -69,74 +71,73 @@ def dl_select_align(sp_infile, hub_species, hub_accession, wkbk_out):
                     seq_record = Entrez.efetch(db='nucleotide', id=refseq_id, retmode='xml')
                     results = Entrez.read(seq_record)
                     accession = results[0]['GBSeq_accession-version']
-                    accession_list.append(accession)
+                    accession_dict['%s' % sp_fullname].append(accession)
                     sp_gen_ct += 1
                     # if this is the hub species, save a separate list of accession numbers for the hub species only
                     if sp_fullname == hub_species:
                         hub_sp_accs.append(accession)
+            # Download the fasta based on the genbank accession number and write to file.
+            with open('%s_genomes.fa' % sp_fullname, 'a') as rel_out:
+                    for acc in accession_dict['%s' % sp_fullname]:
+                        net_handle = Entrez.efetch(db='nucleotide', id=acc, rettype='fasta', retmode='text')
+                        rel_out.write(net_handle.read())
             sp_gen_ct_dict[get_sp_name(species)] = sp_gen_ct
         # Write the full set of assembly records to file.
         ga_df.to_excel(writer, sheet_name='selected_assemblies')
-        # Download the fasta based on the genbank accession number and write to file.
-        if not os.path.isfile('hub_rel_genomes.fa'):
-            with open('hub_rel_genomes.fa', 'a') as rel_out:
-                for acc in accession_list:
-                    net_handle = Entrez.efetch(db='nucleotide', id=acc, rettype='fasta', retmode='text')
-                    rel_out.write(net_handle.read())
-        # Write hub species strains only to a separate file
-        if not os.path.isfile('hub_strains.fa'):
-            with open('hub_strains.fa', 'a') as strain_out:
-                for acc in hub_sp_accs:
-                    net_handle = Entrez.efetch(db='nucleotide', id=acc, rettype='fasta', retmode='text')
-                    strain_out.write(net_handle.read())
-        print('Coolio. Now all the genomes you need are downloaded. Make a blast database out of them and blast the sRNA sequences again them. Then input a filtered file of your blast results to continue to the next step.')
-        fil_blast_name = input('Name of filtered, tabular BLAST results from sRNAs vs. all hub relatives: ')
+        print('Now all the genomes you need are downloaded. Make a blast database out of them and blast the sRNA sequences again them. Filter BLAST results for top query, subject pair only and input the directory where these filtered results are stored.')
+        fil_blast_dir = input('Name of filtered, tabular BLAST results from sRNAs vs. all hub relatives: ')
     ###################################################################################################################################################################
-    # Input should be filtered BLAST tabular results (top hit per query-subject pair; one HSP only)
-        with open(fil_blast_name, 'r') as infile:
-            col_names = ['qseqid', 'sseqid', 'stitle', 'pident', 'qcovs', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'ssend', 'qframe', 'sframe', 'frames', 'evalue', 'bitscore', 'qseq', 'sseq']
-            df = pd.read_csv(infile, sep='\t', header=None, names=col_names)
-            # Reformat the sseqid column to show accession numbers and the stitle column to show just species names
-            df['sseqid'] = df['sseqid'].apply(get_acc_num)
-            df['stitle'] = df['stitle'].apply(get_sp_name)
-            # Drop all rows with an evalue > 0.00001
-            df = df.drop(df[df.evalue > 0.00001].index)
-            print(df.shape)
-        ###################################################################################################################################################################
-            # Drop all rows with qcovs < 60. Resulting table will be the basis for presence/absence matrix
-            df_pam = df.drop(df[df.qcovs < 60].index)
-            print(df_pam.shape)
-            # Create an empty dataframe to hold the presence/absence matrix
-            pa_matrix = pd.DataFrame()
-            # Group results by sRNA
-            pam_sRNA_grp = df_pam.groupby(df_pam['qseqid'])
-            print(sp_gen_ct_dict)
-            pa_dict = {}
-            for name, data in pam_sRNA_grp:
-                stitle_val_cts = data['stitle'].value_counts()
-                for sp_name, num_genomes in sp_gen_ct_dict.items():
+        # Create an empty dataframe to hold the presence/absence matrix
+        pa_matrix = pd.DataFrame()
+        # Create an empty dataframe to hold all the seed sequeces
+        df = pd.DataFrame()
+        # Get the current working directory for future reference
+        cwd = os.getcwd()
+        # Change directories to be where BLAST results are stored
+        os.chdir(fil_blast_dir)
+        for fil_blast_name in os.listdir('.'):
+            if fil_blast_name.endswith('.txt'):
+        # Input should be filtered BLAST tabular results (top hit per query-subject pair; one HSP only)
+                with open(fil_blast_name, 'r') as infile:
+                    sp_name = fil_blast_name.split('.')[0]
                     sp_short = sp_name.split('_')[0][0] + '_' + sp_name.split('_')[1]
-                    if sp_name in stitle_val_cts.index:
-                        num_results = stitle_val_cts.get_value(sp_name)
+                    col_names = ['qseqid', 'sseqid', 'stitle', 'pident', 'qcovs', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'ssend', 'qframe', 'sframe', 'frames', 'evalue', 'bitscore', 'qseq', 'sseq']
+                    sp_df = pd.read_csv(infile, sep='\t', header=None, names=col_names)
+                    # Reformat the sseqid column to show accession numbers and the stitle column to show just species names
+                    sp_df['sseqid'] = sp_df['sseqid'].apply(get_acc_num)
+                    sp_df['stitle'] = sp_df['stitle'].apply(get_sp_name)
+                    # Drop all rows with an evalue > 0.00001
+                    sp_df = sp_df.drop(sp_df[sp_df.evalue > 0.00001].index)
+                    # Append the resulting df to the master dataframe
+                    df = df.append(sp_df)
+        # PRESENCE/ABSENCE MATRIX    
+        ###################################################################################################################################################################
+                    # Drop all rows with qcovs < 60. Resulting table will be the basis for presence/absence matrix
+                    sp_pam = sp_df.drop(sp_df[sp_df.qcovs < 60].index)
+                    # Group results by sRNA
+                    pam_sRNA_grp = sp_pam.groupby(sp_pam['qseqid'])
+                    srna_dict = {}
+                    for name, data in pam_sRNA_grp:
+                        num_results = data.shape[0]
+                        num_genomes = sp_gen_ct_dict[sp_name]
                         if num_results >= 0.75 * num_genomes:
-                            pa_dict[sp_short] = True
-                        else: pa_dict[sp_short] = False
-                    else: pa_dict[sp_short] = False
-                # Add that dictionary to the empty data frame
-                pa_matrix[name] = pd.Series(pa_dict)
-            # Convert the Trues/Falses to ones and zeros and write this presence/absence matrix to file
-            pa_matrix = pa_matrix.astype(int)
-            pa_matrix.to_excel(writer, sheet_name='pa_matrix_for_GLOOME')
-            # Prepare to convert pa matrix to fasta
-            pa_concat = pa_matrix.apply(lambda row: ''.join(map(str, row)), axis=1)
-            # Set of records for fasta
-            with open('msa_for_GLOOME.fa', 'w') as msa_out:
-                msa_records = []
-                for i, val in pa_concat.iteritems():
-                    seq = Seq(str(val))
-                    record = SeqRecord(seq, id=i)
-                    msa_records.append(record)
-                SeqIO.write(msa_records, msa_out, 'fasta')
+                            srna_dict[name] = True
+                        else: srna_dict[name] = False
+                    pa_dict[sp_short] = srna_dict
+        pa_matrix = pd.DataFrame.from_dict(pa_dict, orient='index')
+        # Convert the Trues/Falses to ones and zeros and write this presence/absence matrix to file
+        pa_matrix = pa_matrix.astype(int)
+        pa_matrix.to_excel(writer, sheet_name='pa_matrix_for_GLOOME')
+        # Prepare to convert pa matrix to fasta
+        pa_concat = pa_matrix.apply(lambda row: ''.join(map(str, row)), axis=1)
+        # Set of records for fasta
+        with open('msa_for_GLOOME.fa', 'w') as msa_out:
+            msa_records = []
+            for i, val in pa_concat.iteritems():
+                seq = Seq(str(val))
+                record = SeqRecord(seq, id=i)
+                msa_records.append(record)
+            SeqIO.write(msa_records, msa_out, 'fasta')
 
     ###################################################################################################################################################################        
             # Drop all rows with a pident < 65. Resulting table will be the basis for seed selection
