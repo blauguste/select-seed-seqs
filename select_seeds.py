@@ -136,8 +136,6 @@ def select_seqs(wkbk_out, srnas, blast, hub_accession):
         with open('singleton_srnas.p', 'wb') as outfile:
             pickle.dump(single_seq_srnas, outfile)
 
-select_seqs('pl_results.xlsx', 'ecoli_srnas_for_plpart01.fa', 'ecoli_sRNAS_v_rel_DB_fil.txt', 'NC_000913.3')
-
 if __name__ == '__main__':
     if len(sys.argv) == 5:
          select_seqs(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
