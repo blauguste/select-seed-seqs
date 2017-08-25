@@ -18,6 +18,11 @@ def get_sp_name(str_in):
     sp_name = split_sp_name[0] + ' ' + split_sp_name[1]
     return sp_name
 
+def get_shortname(str_in):
+    split = str(str_in).split(' ')
+    short = split[0][0] + '_' + split[1]
+    return short
+
 def select_seqs(wkbk_out, srnas, blast, hub_accession):
     # Load the genome count dictionary
     single_seq_srnas = []
@@ -34,18 +39,17 @@ def select_seqs(wkbk_out, srnas, blast, hub_accession):
         # Reformat the sseqid column to show accession numbers and the stitle column to show just species names
         df['sseqid'] = df['sseqid'].apply(get_acc_num)
         df['stitle'] = df['stitle'].apply(get_sp_name)
-        # Drop all rows with an evalue > 0.00001
-        df = df.drop(df[df.evalue > 0.00001].index)
 # PRESENCE/ABSENCE MATRIX    
 ###################################################################################################################################################################
-        # Drop all rows with qcovs < 60. Resulting table will be the basis for presence/absence matrix
-        df_pam = df.drop(df[df.qcovs < 60].index)
         # Create an empty dataframe to hold the presence/absence matrix
         pa_matrix = pd.DataFrame()
         # Group results by sRNA
-        pam_sRNA_grp = df_pam.groupby(df_pam['qseqid'])
+        overall_res = df['qseqid'].value_counts()
+        print(overall_res)
+        pam_sRNA_grp = df.groupby(df['qseqid'])
         pa_dict = {}
         for name, data in pam_sRNA_grp:
+            #print(pam_sRNA_grp.head())
             stitle_val_cts = data['stitle'].value_counts()
             print(stitle_val_cts)
             for sp_name, num_genomes in gen_ct_dict.items():		
@@ -56,7 +60,7 @@ def select_seqs(wkbk_out, srnas, blast, hub_accession):
                     else: pa_dict[sp_name] = False
                 else: 
                     pa_dict[sp_name] = False
-                    print('%s not found in BLAST results' % sp_name)
+                    #print('%s not found in BLAST results' % sp_name)
             # Add that dictionary to the empty data frame
             pa_matrix[name] = pd.Series(pa_dict)
         # Convert the Trues/Falses to ones and zeros and write this presence/absence matrix to file
@@ -69,7 +73,8 @@ def select_seqs(wkbk_out, srnas, blast, hub_accession):
             msa_records = []
             for i, val in pa_concat.iteritems():
                 seq = Seq(str(val))
-                record = SeqRecord(seq, id=i)
+                sp_short = get_shortname(i)
+                record = SeqRecord(seq, id=sp_short)
                 msa_records.append(record)
             SeqIO.write(msa_records, msa_out, 'fasta')
     # SEED SEQUENCES
@@ -124,15 +129,15 @@ def select_seqs(wkbk_out, srnas, blast, hub_accession):
             with open(prealign_fn, 'w') as prealign_out:
                 SeqIO.write(seq_records, prealign_out, 'fasta')
             # Align the sequences with Clustal and write to file
-            #if len(seq_records) > 1:
-                #clustal_align = ClustalOmegaCommandline(infile=prealign_fn, outfile=aligned_outfn, verbose=True)
-                #clustal_align()
-            #else: 
-                #single_seq_srnas.append(name)
+            if len(seq_records) > 1:
+                clustal_align = ClustalOmegaCommandline(infile=prealign_fn, outfile=aligned_outfn, verbose=True)
+                clustal_align()
+            else: 
+                single_seq_srnas.append(name)
         all_seed_seqs.to_excel(writer, sheet_name='seed_sequences')
         writer.save()
         if len(single_seq_srnas) > 0:
-            print('These srnas had no homologs outside of the hub:\n %s' % single_seq_srnas)
+            print('These srnas have only one sequence in their alignment file:\n %s' % single_seq_srnas)
         with open('singleton_srnas.p', 'wb') as outfile:
             pickle.dump(single_seq_srnas, outfile)
 
