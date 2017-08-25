@@ -29,6 +29,7 @@ def get_accession(assembly_id):
 def dl_seqs(email, sp_infile, wkbk_out):
 
     Entrez.email = email
+    unused_assemblies = []
 
     # Read the species names into a list
     with open(sp_infile, 'r') as sp_in:
@@ -55,7 +56,7 @@ def dl_seqs(email, sp_infile, wkbk_out):
                     ftp.cwd(sum_dir)
                     ftp.retrbinary('RETR assembly_summary.txt', sumfile.write)
                     ftp.quit
-            with open(sum_fn, 'r') as sumfile:
+            with open(sum_fn, 'rb') as sumfile:
                 assembly_df = pd.read_csv(sumfile, sep='\t', skiprows=1, header=0)
                 print(assembly_df.shape)
                 # Drop all of the rows for which assembly level != Complete Genome
@@ -70,31 +71,21 @@ def dl_seqs(email, sp_infile, wkbk_out):
                 assembly_list.extend(list(assembly_df['gbrs_paired_asm']))
                 # Append retained records to assembly master dataframe
                 ga_df = ga_df.append(assembly_df)
-                # Download the fasta based on the genbank accession number and write to file.
+                # Download the fasta based on the genbank accession number and write to file if the name on the fasta matches the species name.
                 sp_gen_ct = 0
                 with open('%s_genomes.fa' % sp_fullname, 'a') as rel_out:
                     for acc in accession_dict['%s' % sp_fullname]:
-                        net_handle = Entrez.efetch(db='nucleotide', id=acc, rettype='fasta', retmode='text')
-                        rel_out.write(net_handle.read())
-                        sp_gen_ct += 1
-            with open('%s_genomes.fa' % sp_fullname, 'r') as fastas_in:
-                records = SeqIO.parse(fastas_in, 'fasta')
-                sp_names = set(record.description.split(' ')[1] + ' ' + record.description.split(' ')[2] for record in records)
-                print(sp_names)
-                # Print a message if name in gb file doesn't match original species name
-                has_alias = False
-                if len(sp_names) > 1: 
-                    print('This species goes by multiple names. Manually curate PA matrix.')
-                if species not in sp_names and len(sp_names) >= 1:
-                    print('Species alias found. Input species name: %s; Fasta species name(s): %s' % (species, sp_names))
-                    alias = input('Enter species name to use as alias <Genus species>, or type <n> to proceed without alias\n')
-                    if alias.lower() == 'no' or alias.lower() == 'n':
-                        alias = None
-                    else: has_alias = True
-                else: alias = None
+                        with Entrez.efetch(db='nucleotide', id=acc, rettype='fasta', retmode='text') as handle:
+                            seq_record = SeqIO.read(handle, 'fasta')
+                            org = seq_record.description.split(' ')[1] + ' ' + seq_record.description.split(' ')[2]
+                            if org == species:
+                                SeqIO.write(seq_record, rel_out, 'fasta')
+                                sp_gen_ct += 1
+                            else:
+                                unused_assemblies.append(seq_record.id)
             sp_gen_ct_dict[species] = sp_gen_ct
-            if has_alias == True:
-                sp_gen_ct_dict[alias] = sp_gen_ct
+        # Mark those assemblies with accessions that were not used because fasta name didn't match organism name
+        ga_df.loc[ga_df.paired_GB_accession.isin(unused_assemblies), 'notes'] = 'dropped due to name mismatch'
         # Write the full set of assembly records to file.
         ga_df.to_excel(writer, sheet_name='selected_assemblies')
         writer.save()
