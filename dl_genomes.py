@@ -72,17 +72,27 @@ def dl_seqs(email, sp_infile, wkbk_out):
                 # Append retained records to assembly master dataframe
                 ga_df = ga_df.append(assembly_df)
                 # Download the fasta based on the genbank accession number and write to file if the name on the fasta matches the species name.
-                sp_gen_ct = 0
-                with open('%s_genomes.fa' % sp_fullname, 'a') as rel_out:
-                    for acc in accession_dict['%s' % sp_fullname]:
-                        with Entrez.efetch(db='nucleotide', id=acc, rettype='fasta', retmode='text') as handle:
-                            seq_record = SeqIO.read(handle, 'fasta')
-                            org = seq_record.description.split(' ')[1] + ' ' + seq_record.description.split(' ')[2]
-                            if org == species:
-                                SeqIO.write(seq_record, rel_out, 'fasta')
-                                sp_gen_ct += 1
+                if not os.path.isfile('%s_genomes.fa' % sp_fullname):
+                    with open('%s_genomes.fa' % sp_fullname, 'a') as rel_out:
+                        for acc in accession_dict['%s' % sp_fullname]:
+                            with Entrez.efetch(db='nucleotide', id=acc, rettype='fasta', retmode='text') as handle:
+                                seq_record = SeqIO.read(handle, 'fasta')
+                                org = seq_record.description.split(' ')[1] + ' ' + seq_record.description.split(' ')[2]
+                                if org == species:
+                                    SeqIO.write(seq_record, rel_out, 'fasta')
+                                    sp_gen_ct += 1
+                                else:
+                                    unused_assemblies.append(seq_record.id)
+                else:
+                    with open('%s_genomes.fa' % sp_fullname, 'r') as rel_in:
+                        # Make a dictionary of the accession numbers present in the genome FASTA
+                        records = SeqIO.parse(rel_in, 'fasta')
+                        accs = list(r.id for r in records)
+                        for acc in accession_dict['%s' % sp_fullname]:
+                            if acc not in accs:
+                                unused_assemblies.append(acc)
                             else:
-                                unused_assemblies.append(seq_record.id)
+                                sp_gen_ct += 1
             sp_gen_ct_dict[species] = sp_gen_ct
         # Mark those assemblies with accessions that were not used because fasta name didn't match organism name
         ga_df.loc[ga_df.paired_GB_accession.isin(unused_assemblies), 'notes'] = 'dropped due to name mismatch'

@@ -1,15 +1,15 @@
-import csv, sys, os
+import sys
+import os
+import ftplib
+import os.path
 import pandas as pd
 #import matplotlib.pyplot as plot
 import numpy as np
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from Bio.Alphabet import IUPAC
 from Bio.Align.Applications import ClustalOmegaCommandline
-import ftplib
 from Bio import Entrez
-import os.path
 
 Entrez.email = 'hdutcher@pdx.edu'
 
@@ -87,12 +87,11 @@ def dl_select_align(sp_infile, hub_species, hub_accession, wkbk_out):
         print('Now all the genomes you need are downloaded. Make a blast database out of them and blast the sRNA sequences again them. Filter BLAST results for top query, subject pair only and input the directory where these filtered results are stored.')
         fil_blast_dir = input('Name of filtered, tabular BLAST results from sRNAs vs. all hub relatives: ')
     ###################################################################################################################################################################
-        # Create an empty dataframe to hold the presence/absence matrix
-        pa_matrix = pd.DataFrame()
         # Create an empty dataframe to hold all the seed sequeces
         df = pd.DataFrame()
         # Get the current working directory for future reference
         cwd = os.getcwd()
+        pa_dict = {}
         # Change directories to be where BLAST results are stored
         os.chdir(fil_blast_dir)
         for fil_blast_name in os.listdir('.'):
@@ -125,6 +124,10 @@ def dl_select_align(sp_infile, hub_species, hub_accession, wkbk_out):
                         else: srna_dict[name] = False
                     pa_dict[sp_short] = srna_dict
         pa_matrix = pd.DataFrame.from_dict(pa_dict, orient='index')
+        # Convert Nan values to 'False'
+        pa_matrix.fillna(False, inplace=True)
+        # Change back to the original working directory
+        os.chdir(cwd)
         # Convert the Trues/Falses to ones and zeros and write this presence/absence matrix to file
         pa_matrix = pa_matrix.astype(int)
         pa_matrix.to_excel(writer, sheet_name='pa_matrix_for_GLOOME')
@@ -138,7 +141,7 @@ def dl_select_align(sp_infile, hub_species, hub_accession, wkbk_out):
                 record = SeqRecord(seq, id=i)
                 msa_records.append(record)
             SeqIO.write(msa_records, msa_out, 'fasta')
-
+    # SEED SEQUENCES
     ###################################################################################################################################################################        
             # Drop all rows with a pident < 65. Resulting table will be the basis for seed selection
             df_ss = df.drop(df[df.pident < 65].index)

@@ -23,7 +23,7 @@ def get_shortname(str_in):
     short = split[0][0] + '_' + split[1]
     return short
 
-def select_seqs(wkbk_out, srnas, blast, hub_accession):
+def select_seqs(wkbk_out, srnas, blast, hub_species, hub_accession):
     # Load the genome count dictionary
     single_seq_srnas = []
     gen_ct_dict = pickle.load(open('sp_gen_ct.p', 'rb'))
@@ -36,9 +36,12 @@ def select_seqs(wkbk_out, srnas, blast, hub_accession):
         with open(blast, 'r') as infile:
             col_names = ['qseqid', 'sseqid', 'stitle', 'pident', 'qcovs', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'ssend', 'qframe', 'sframe', 'frames', 'evalue', 'bitscore', 'qseq', 'sseq']
             df = pd.read_csv(infile, sep='\t', header=None, names=col_names)
-        # Reformat the sseqid column to show accession numbers and the stitle column to show just species names
+        # Reformat the sseqid column to show accession numbers and add a column with just the species name
         df['sseqid'] = df['sseqid'].apply(get_acc_num)
-        df['stitle'] = df['stitle'].apply(get_sp_name)
+        df['sshorttitle'] = df['stitle'].apply(get_sp_name)
+        # Save a dataframe of just the hub species data to use later
+        df_hub = df.drop(df[df.sshorttitle != hub_species].index)
+        
 # PRESENCE/ABSENCE MATRIX    
 ###################################################################################################################################################################
         # Create an empty dataframe to hold the presence/absence matrix
@@ -50,7 +53,7 @@ def select_seqs(wkbk_out, srnas, blast, hub_accession):
         pa_dict = {}
         for name, data in pam_sRNA_grp:
             #print(pam_sRNA_grp.head())
-            stitle_val_cts = data['stitle'].value_counts()
+            stitle_val_cts = data['sshorttitle'].value_counts()
             print(stitle_val_cts)
             for sp_name, num_genomes in gen_ct_dict.items():		
                 if sp_name in stitle_val_cts.index:
@@ -142,8 +145,8 @@ def select_seqs(wkbk_out, srnas, blast, hub_accession):
             pickle.dump(single_seq_srnas, outfile)
 
 if __name__ == '__main__':
-    if len(sys.argv) == 5:
-         select_seqs(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
+    if len(sys.argv) == 6:
+         select_seqs(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
     else:
-         print("Usage: select_seeds.py excel_workbook.xlsx srna_seqs.fa filtered_blast_results.txt hub_accession")
+         print("Usage: select_seeds.py excel_workbook.xlsx srna_seqs.fa filtered_blast_results.txt hub_species hub_accession")
          sys.exit(0)
