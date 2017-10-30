@@ -1,13 +1,10 @@
 import pickle
-import os.path
 import sys
 import pandas as pd
 #import matplotlib.pyplot as plot
-import numpy as np
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from Bio.Align.Applications import ClustalOmegaCommandline
 
 def get_acc_num(str_in):
     acc_num = str_in.split('|')[1]
@@ -54,14 +51,12 @@ def compare_rows(group):
                 winners.append(i)
     return group.loc[winners].drop_duplicates()
 
-def select_seqs(wkbk_out, srnas, blast):
+def make_matrix(wkbk_out, blast):
 
     # Load the assembly dictionary
     asmbly_dict = pickle.load(open('asmbly_dict.p', 'rb'))
     
-    # Store the srna sequences of interest for later use
-    with open(srnas, 'r') as srnas_in:
-        srna_dict = SeqIO.to_dict(SeqIO.parse(srnas_in, 'fasta'))
+    # Create Excel workbook to write to
     with open(wkbk_out, 'ab') as outfile:
         writer = pd.ExcelWriter(outfile)
         
@@ -85,12 +80,24 @@ def select_seqs(wkbk_out, srnas, blast):
         df.sort_values(['sseqid', 'evalue'], ascending=[True, True], inplace=True)
         
         # Identify any overlaps in BLAST results and remove them from the dataframe
-        df_nr = df.groupby(['sseqid', 'sframe']).apply(compare_rows)
-        df_nr.reset_index
+        df_nr = df.groupby(['sseqid', 'sframe'], as_index=False).apply(compare_rows)
+        print(df_nr.index)
+        
+        # Drop the extra level of indexing gained via the groupby operation
+        df_nr.index = df_nr.index.droplevel(level=0)
+        print(df_nr.index)
 
         # Find the difference between the original results and the nr results, to be saved and examined later. Save BLAST results, too.
         overlaps = df[~df.index.isin(df_nr.index)]
-        df_nr.to_excel(writer, sheet_name='BLAST_top_hit_only')
+        print(overlaps)
+        
+        with open('nr_blast_results.csv', 'w') as out:
+            df_nr.to_csv(out)
+        
+        with open('redundant_blast_results.csv', 'w') as out:
+            overlaps.to_csv(out)
+
+        df_nr.to_excel(writer, sheet_name='nr_BLAST')
         overlaps.to_excel(writer, sheet_name='removed_due_to_overlap')
 
         # Group results by sRNA    
@@ -110,13 +117,11 @@ def select_seqs(wkbk_out, srnas, blast):
                         pa_dict[value] = False
             # Add that dictionary to the empty data frame
             pa_matrix[name] = pd.Series(pa_dict)
-            print(pa_matrix)
-        
-        # Convert Nan values to False
-        print(pa_matrix)
 
         # Convert the Trues/Falses to ones and zeros and write this presence/absence matrix to file
         pa_matrix = pa_matrix.astype(int)
+        with open('test_matrix.csv', 'w') as csv:
+            pa_matrix.to_csv(csv)
         pa_matrix.to_excel(writer, sheet_name='pa_matrix_for_GLOOME')
         # Prepare to convert pa matrix to fasta
         pa_concat = pa_matrix.apply(lambda row: ''.join(map(str, row)), axis=1)
@@ -131,4 +136,9 @@ def select_seqs(wkbk_out, srnas, blast):
             SeqIO.write(msa_records, msa_out, 'fasta')
         writer.save()
 
-select_seqs('test_seeds.xls', 'srnas.fasta', 'example_blast_results.txt')
+if __name__ == '__main__':
+    if len(sys.argv) == 3:
+         make_matrix(sys.argv[1], sys.argv[2])
+    else:
+         print('Usage: pa_matrix.py excel_workbook.xlsx filtered_blast_results.txt')
+         sys.exit(0)
