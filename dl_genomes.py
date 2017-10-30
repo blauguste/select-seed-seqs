@@ -118,8 +118,6 @@ def dl_seqs(email, sp_infile, wkbk_out):
     with open('asmbly_dict.p', 'wb') as dictout:
         pickle.dump(identifier_dict, dictout)
 
-dl_seqs('hdutcher@pdx.edu', 'test_species.txt', 'test.xlsx')
-
 if __name__ == '__main__':
     if len(sys.argv) == 4:
          dl_seqs(sys.argv[1], sys.argv[2], sys.argv[3])
