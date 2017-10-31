@@ -91,7 +91,6 @@ def dl_seqs(email, sp_infile, wkbk_out):
 
         # Write the full set of assembly records to file.
         ga_df.to_excel(writer, sheet_name='selected_assemblies')
-        incl_df.to_excel(writer, sheet_name='all_accessions_with_notes')
         writer.save()
     
     # Store assembly dictionary for later use
