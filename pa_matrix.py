@@ -51,11 +51,22 @@ def compare_rows(group):
                 winners.append(i)
     return group.loc[winners].drop_duplicates()
 
-def make_matrix(wkbk_out, blast):
+def make_matrix(wkbk_out, blast, srnas):
 
     # Load the assembly dictionary
     asmbly_dict = pickle.load(open('asmbly_dict.p', 'rb'))
+    print(asmbly_dict)
     
+    # Store the srna sequences of interest for later use
+    with open(srnas, 'r') as srnas_in:
+        srna_dict = SeqIO.to_dict(SeqIO.parse(srnas_in, 'fasta'))
+    with open('srnas.p', 'wb') as srnas_out:
+        pickle.dump(srna_dict, srnas_out)
+
+    # Make an srna length dictionary
+    srna_len = {name: len(sequence) for name, sequence in srna_dict.items()}
+    print(srna_len)
+
     # Create Excel workbook to write to
     with open(wkbk_out, 'ab') as outfile:
         writer = pd.ExcelWriter(outfile)
@@ -78,6 +89,21 @@ def make_matrix(wkbk_out, blast):
        
         # Sort the results by sseqid and evalue
         df.sort_values(['sseqid', 'evalue'], ascending=[True, True], inplace=True)
+
+        # Map original sRNA length to the BLAST results
+        df['srna_orig_len'] = df['qseqid'].map(srna_len)
+        print(df)
+
+        # Add a column that calculates percent coverage
+        df['perc_coverage'] = df['sseq'].str.len()/df['srna_orig_len']
+        print(df)
+
+        # Drop if % coverage is not at least 60
+        df = df.drop(df[df.perc_coverage < 0.60].index)
+
+        # Store the dataframe for later use
+        with open('BLAST_results_with_cov.p', 'wb') as blast_out:
+            pickle.dump(df, blast_out)        
         
         # Identify any overlaps in BLAST results and remove them from the dataframe
         df_nr = df.groupby(['sseqid', 'sframe'], as_index=False).apply(compare_rows)
@@ -87,7 +113,11 @@ def make_matrix(wkbk_out, blast):
         df_nr.index = df_nr.index.droplevel(level=0)
         print(df_nr.index)
 
-        # Find the difference between the original results and the nr results, to be saved and examined later. Save BLAST results, too.
+        # Store the non-redundant list for later use
+        with open('nr_BLAST_results.p', 'wb') as blast_out:
+            pickle.dump(df_nr, blast_out)
+
+        # Find the difference between the original results and the nr results, to be saved and examined later.
         overlaps = df[~df.index.isin(df_nr.index)]
         print(overlaps)
         
@@ -120,7 +150,7 @@ def make_matrix(wkbk_out, blast):
 
         # Convert the Trues/Falses to ones and zeros and write this presence/absence matrix to file
         pa_matrix = pa_matrix.astype(int)
-        with open('test_matrix.csv', 'w') as csv:
+        with open('matrix.csv', 'w') as csv:
             pa_matrix.to_csv(csv)
         pa_matrix.to_excel(writer, sheet_name='pa_matrix_for_GLOOME')
         # Prepare to convert pa matrix to fasta
@@ -137,8 +167,8 @@ def make_matrix(wkbk_out, blast):
         writer.save()
 
 if __name__ == '__main__':
-    if len(sys.argv) == 3:
-         make_matrix(sys.argv[1], sys.argv[2])
+    if len(sys.argv) == 4:
+         make_matrix(sys.argv[1], sys.argv[2], sys.argv[3])
     else:
-         print('Usage: pa_matrix.py excel_workbook.xlsx filtered_blast_results.txt')
+         print('Usage: pa_matrix.py excel_workbook.xlsx filtered_blast_results.txt srnas.fasta')
          sys.exit(0)
