@@ -120,12 +120,6 @@ def make_matrix(wkbk_out, blast, srnas):
         # Find the difference between the original results and the nr results, to be saved and examined later.
         overlaps = df[~df.index.isin(df_nr.index)]
         print(overlaps)
-        
-        with open('nr_blast_results.csv', 'w') as out:
-            df_nr.to_csv(out)
-        
-        with open('redundant_blast_results.csv', 'w') as out:
-            overlaps.to_csv(out)
 
         df_nr.to_excel(writer, sheet_name='nr_BLAST')
         overlaps.to_excel(writer, sheet_name='removed_due_to_overlap')
@@ -150,8 +144,6 @@ def make_matrix(wkbk_out, blast, srnas):
 
         # Convert the Trues/Falses to ones and zeros and write this presence/absence matrix to file
         pa_matrix = pa_matrix.astype(int)
-        with open('matrix.csv', 'w') as csv:
-            pa_matrix.to_csv(csv)
         pa_matrix.to_excel(writer, sheet_name='pa_matrix_for_GLOOME')
         # Prepare to convert pa matrix to fasta
         pa_concat = pa_matrix.apply(lambda row: ''.join(map(str, row)), axis=1)
