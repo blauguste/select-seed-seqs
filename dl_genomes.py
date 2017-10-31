@@ -34,7 +34,6 @@ def dl_seqs(email, sp_infile, wkbk_out):
         sp_list = list(line.rsplit('\n')[0] for line in sp_in)
 
     # Create an excel workbook to write results to:
-    assembly_list = []
     with open(wkbk_out, 'wb') as outfile:
         writer = pd.ExcelWriter(outfile)
         ga_df = pd.DataFrame()
@@ -55,6 +54,7 @@ def dl_seqs(email, sp_infile, wkbk_out):
                     ftp.cwd(sum_dir)
                     ftp.retrbinary('RETR assembly_summary.txt', sumfile.write)
                     ftp.quit
+            
             with open(sum_fn, 'rb') as sumfile:
                 assembly_df = pd.read_csv(sumfile, sep='\t', skiprows=1, header=0)
                 print(assembly_df.shape)
@@ -70,45 +70,25 @@ def dl_seqs(email, sp_infile, wkbk_out):
                 assembly_df['paired_GB_accession'] = assembly_df['gbrs_paired_asm'].apply(get_accession)
                 new_df = assembly_df[assembly_df['paired_GB_accession'].notnull()]
                 accession_dict['%s' % sp_fullname] = list(new_df['paired_GB_accession'])
-                assembly_list.extend(list(assembly_df['gbrs_paired_asm']))
                 
                 # Append retained records to assembly master dataframe
                 ga_df = ga_df.append(assembly_df)
                 
-                # Download the fasta based on the genbank accession number and write to file if the name on the fasta matches the species name.
+                # Download the fasta based on the genbank accession number and write to file
                 if not os.path.isfile('%s_genomes.fa' % sp_fullname):
                     with open('%s_genomes.fa' % sp_fullname, 'a') as rel_out:
                         for accesions in accession_dict['%s' % sp_fullname]:
                             for acc in accesions:
                                 with Entrez.efetch(db='nucleotide', id=acc, rettype='fasta', retmode='text') as handle:
                                     seq_record = SeqIO.read(handle, 'fasta')
-                                    org = seq_record.description.split(' ')[1] + ' ' + seq_record.description.split(' ')[2]
-                                    if org == species:
-                                        SeqIO.write(seq_record, rel_out, 'fasta')
-                                    else:
-                                        unused_assemblies.append(seq_record.id)
-                else:
-                    with open('%s_genomes.fa' % sp_fullname, 'r') as rel_in:
-                        # Make a dictionary of the accession numbers present in the genome FASTA
-                        records = SeqIO.parse(rel_in, 'fasta')
-                        accs = list(r.id for r in records)
-                        for accesions in accession_dict['%s' % sp_fullname]:
-                            for acc in accesions:
-                                if acc not in accs:
-                                    unused_assemblies.append(acc)
+                                    SeqIO.write(seq_record, rel_out, 'fasta')
         
-        print(ga_df)
-        s = ga_df.apply(lambda x: pd.Series(x['paired_GB_accession']), axis=1).stack().reset_index(level=1, drop=True)
-        s.name = 'accession'
-        incl_df = ga_df.drop('paired_GB_accession', axis=1).join(s)
-        print(incl_df)
-        # Mark those assemblies with accessions that were not used because fasta name didn't match organism name
-        incl_df.loc[incl_df.accession.isin(unused_assemblies), 'notes'] = 'dropped due to name mismatch'
-
         # Save a record of which accessions belong to which assemblies 
-        identifier_dict = pd.Series(incl_df.gbrs_paired_asm.values, index=incl_df.accession).to_dict()
-        print(identifier_dict)
-        
+        identifier_dict = {}
+        for i, row in ga_df.iterrows():
+            for item in row['paired_GB_accession']:
+                identifier_dict[item] = row['gbrs_paired_asm']
+
         # Write the full set of assembly records to file.
         ga_df.to_excel(writer, sheet_name='selected_assemblies')
         incl_df.to_excel(writer, sheet_name='all_accessions_with_notes')
