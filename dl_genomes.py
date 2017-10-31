@@ -85,7 +85,7 @@ def dl_seqs(email, sp_infile, wkbk_out):
         
         # Save a record of which accessions belong to which assemblies 
         identifier_dict = {}
-        for i, row in ga_df.iterrows():
+        for i, row in ga_df[ga_df['paired_GB_accession'].notnull()].iterrows():
             for item in row['paired_GB_accession']:
                 identifier_dict[item] = row['gbrs_paired_asm']
 
