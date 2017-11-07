@@ -67,6 +67,10 @@ def make_matrix(wkbk_out, blast, srnas):
     srna_len = {name: len(sequence) for name, sequence in srna_dict.items()}
     print(srna_len)
 
+    # Save the sRNA length dictionary
+    with open('srna_len.p', 'wb') as outfile:
+        pickle.dump(srna_len, outfile)
+
     # Create Excel workbook to write to
     with open(wkbk_out, 'ab') as outfile:
         writer = pd.ExcelWriter(outfile)
@@ -124,6 +128,9 @@ def make_matrix(wkbk_out, blast, srnas):
         df_nr.to_excel(writer, sheet_name='nr_BLAST')
         overlaps.to_excel(writer, sheet_name='removed_due_to_overlap')
 
+        # Create an empty dictionary to hold the genomes for which each sRNA is present
+        present_dict = {}
+
         # Group results by sRNA    
         srna_grp = df_nr.groupby(df_nr['qseqid'])
 
@@ -131,6 +138,7 @@ def make_matrix(wkbk_out, blast, srnas):
             print(name)
             pa_dict = {}
             present = data['sseqid'].tolist()
+            present_dict[name] = set(acc for acc in present)
             for key, value in asmbly_dict.items():
                 if key in present:
                     pa_dict[value] = True
@@ -141,6 +149,10 @@ def make_matrix(wkbk_out, blast, srnas):
                         pa_dict[value] = False
             # Add that dictionary to the empty data frame
             pa_matrix[name] = pd.Series(pa_dict)
+
+        # Write the presence dictionary to file
+        with open('presence_dict.p', 'wb') as outfile:
+            pickle.dump(present_dict, outfile)
 
         # Convert the Trues/Falses to ones and zeros and write this presence/absence matrix to file
         pa_matrix = pa_matrix.astype(int)
