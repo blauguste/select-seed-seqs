@@ -106,8 +106,7 @@ def make_matrix(wkbk_out, blast, srnas):
         df = df.drop(df[df.perc_coverage < 0.60].index)
 
         # Store the dataframe for later use
-        with open('BLAST_results_with_cov.p', 'wb') as blast_out:
-            pickle.dump(df, blast_out)        
+        df.to_pickle('BLAST_results_with_cov.p')  
         
         # Identify any overlaps in BLAST results and remove them from the dataframe
         df_nr = df.groupby(['sseqid', 'sframe'], as_index=False).apply(compare_rows)
@@ -118,8 +117,7 @@ def make_matrix(wkbk_out, blast, srnas):
         print(df_nr.index)
 
         # Store the non-redundant list for later use
-        with open('nr_BLAST_results.p', 'wb') as blast_out:
-            pickle.dump(df_nr, blast_out)
+        df_nr.to_pickle('nr_BLAST_results.p')
 
         # Find the difference between the original results and the nr results, to be saved and examined later.
         overlaps = df[~df.index.isin(df_nr.index)]
