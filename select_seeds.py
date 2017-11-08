@@ -31,7 +31,7 @@ def select_seqs(wkbk_out, hub_accession):
         single_seq_srnas = []
         
         # Load the filtered BLAST results
-        with open('BLAST_results_with_cov.p', 'rb') as infile:
+        with open('nr_BLAST_results.p', 'rb') as infile:
             df = pickle.load(infile)
 
         # Load the sRNA sequences
