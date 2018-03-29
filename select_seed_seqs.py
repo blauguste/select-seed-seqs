@@ -1,3 +1,5 @@
+#### ALL DEPRECATED!!
+
 import sys
 import os
 import ftplib
@@ -10,8 +12,6 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Align.Applications import ClustalOmegaCommandline
 from Bio import Entrez
-
-Entrez.email = 'hdutcher@pdx.edu'
 
 def get_acc_num(str_in):
     acc_num = str_in.split('|')[1]
