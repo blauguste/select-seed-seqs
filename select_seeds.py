@@ -23,7 +23,7 @@ def get_shortname(str_in):
     short = split[0][0] + '_' + split[1]
     return short
 
-def select_seqs(wkbk_out, hub_accession):
+def select_seqs(wkbk_out):
 
     with open(wkbk_out, 'ab') as outfile:
         writer = pd.ExcelWriter(outfile)
@@ -45,7 +45,6 @@ def select_seqs(wkbk_out, hub_accession):
         else:    
             # Make an srna length dictionary
             srna_len = {name: len(sequence) for name, sequence in srna_dict.items()}
-            print(srna_len)
             
         # Drop all rows with a pident < 65. Resulting table will be the basis for seed selection
         df_ss = df.drop(df[df.pident < 65].index)
@@ -74,18 +73,11 @@ def select_seqs(wkbk_out, hub_accession):
             bin_bounds = list(zip(bin_bound_lst, bin_bound_lst[1:]))
             seed_seqs = pd.DataFrame()
             
-            # Add the hub sRNA sequence to the seed sequence list
-            hub_hit = data_good_cov.loc[data_good_cov['sseqid'] == hub_accession]
-            seed_seqs = seed_seqs.append(hub_hit)
-            
-            # Before selecting hits based on bin boundaries, remove the hub hits since they'll already be included
-            data_good_cov_minus_hub = data_good_cov.drop(data_good_cov[data_good_cov.sseqid == hub_accession].index) 
-            
             for lower, upper in bin_bounds:
             
                 # Filter the results with good coverage 
-                bb_filter = (data_good_cov_minus_hub['pident'] > lower) & (data_good_cov_minus_hub['pident'] < upper)
-                good_cov_filtered = data_good_cov_minus_hub[bb_filter]
+                bb_filter = (data_good_cov['pident'] > lower) & (data_good_cov['pident'] < upper)
+                good_cov_filtered = data_good_cov[bb_filter]
                 
                 # If there are samples that fall within a given histogram bin, randomly select one of them
                 if not good_cov_filtered.empty:
@@ -93,13 +85,15 @@ def select_seqs(wkbk_out, hub_accession):
                     seed_seqs = seed_seqs.append(selected_hit)
             
             seq_records = []
-            prealign_fn = name + '_seqs_for_seed.fa'
+            prealign_fn = name + '_seqs_for_seed_unaligned.fa'
             
             for i, series in seed_seqs.iterrows():
                 accession = series['sseqid']
+                s = series['sstart']
+                e = series['send']
                 description = name + ' homolog; originates from BLAST hit ' + str(i)
                 seq = series['sseq']
-                new_rec = SeqRecord(Seq(seq), id=accession, description=description)
+                new_rec = SeqRecord(Seq(seq), id=accession+'/'+s+'-'+e, description=description)
                 seq_records.append(new_rec)
             all_seed_seqs = all_seed_seqs.append(seed_seqs)
         
@@ -122,7 +116,7 @@ def select_seqs(wkbk_out, hub_accession):
 
 if __name__ == '__main__':
     if len(sys.argv) == 3:
-         select_seqs(sys.argv[1], sys.argv[2])
+         select_seqs(sys.argv[1])
     else:
-         print("Usage: select_seeds.py excel_workbook.xlsx hub_accession")
+         print("Usage: select_seeds.py excel_workbook.xlsx")
          sys.exit(0)
